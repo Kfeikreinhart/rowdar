@@ -4,9 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Live GPS Tracking</title>
-    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDv-XXvnWnZ3_BW65BZMG6DYRFRFuQpdl4" defer></script>
-    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js" defer></script>
-    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js" defer></script>
+    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDv-XXvnWnZ3_BW65BZMG6DYRFRFuQpdl4"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js"></script>
     <style>
         body {
             background: linear-gradient(to bottom, black, grey);
@@ -17,6 +17,7 @@
         #map {
             width: 100%;
             height: 500px;
+            margin: 20px auto;
         }
     </style>
 </head>
@@ -26,14 +27,23 @@
     <button onclick="startTracking()">Start Tracking</button>
     <button onclick="viewTracking()">View Tracking</button>
     <div id="map"></div>
+    
     <script>
-        const firebaseConfig = YOUR_FIREBASE_CONFIG;
+        // Replace with your Firebase Config
+        const firebaseConfig = {
+            apiKey: "YOUR_API_KEY",
+            authDomain: "YOUR_AUTH_DOMAIN",
+            databaseURL: "YOUR_DATABASE_URL",
+            projectId: "YOUR_PROJECT_ID",
+            storageBucket: "YOUR_STORAGE_BUCKET",
+            messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+            appId: "YOUR_APP_ID"
+        };
+        
         firebase.initializeApp(firebaseConfig);
         const db = firebase.database();
 
-        let map;
-        let marker;
-        let path;
+        let map, marker, path;
         let pathCoordinates = [];
         let watchId;
 
@@ -44,6 +54,7 @@
             });
             marker = new google.maps.Marker({
                 map: map,
+                position: { lat: 42.3655, lng: -71.1089 }
             });
             path = new google.maps.Polyline({
                 path: pathCoordinates,
@@ -61,7 +72,8 @@
                     const lat = position.coords.latitude;
                     const lng = position.coords.longitude;
                     db.ref("location").set({ lat, lng });
-                }, () => {
+                }, (error) => {
+                    console.error("Geolocation error: ", error);
                     alert("Geolocation failed.");
                 }, { enableHighAccuracy: true });
             } else {
@@ -86,7 +98,7 @@
             path.setPath(pathCoordinates);
         }
 
-        window.onload = () => initMap();
+        window.onload = initMap;
     </script>
 </body>
 </html>
