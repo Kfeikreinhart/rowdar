@@ -3,8 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GPS Location on Google Maps</title>
+    <title>Live GPS Tracking</title>
     <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDv-XXvnWnZ3_BW65BZMG6DYRFRFuQpdl4" defer></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js" defer></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js" defer></script>
     <style>
         body {
             background: linear-gradient(to bottom, black, grey);
@@ -19,24 +21,28 @@
     </style>
 </head>
 <body>
-    <h1>Rowdar</h1>
+    <h1>Live GPS Tracking</h1>
     <h2>by CRLS Lemelson-MIT InvenTeam</h2>
     <button onclick="startTracking()">Start Tracking</button>
+    <button onclick="viewTracking()">View Tracking</button>
     <div id="map"></div>
     <script>
+        const firebaseConfig = YOUR_FIREBASE_CONFIG;
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
+
         let map;
         let marker;
-        let watchId;
         let path;
         let pathCoordinates = [];
+        let watchId;
 
-        function initMap(lat = 42.372330, lng = -71.133632) {
+        function initMap() {
             map = new google.maps.Map(document.getElementById("map"), {
-                center: { lat: lat, lng: lng },
+                center: { lat: 42.3655, lng: -71.1089 },
                 zoom: 15,
             });
             marker = new google.maps.Marker({
-                position: { lat: lat, lng: lng },
                 map: map,
             });
             path = new google.maps.Polyline({
@@ -51,20 +57,25 @@
 
         function startTracking() {
             if (navigator.geolocation) {
-                watchId = navigator.geolocation.watchPosition(
-                    (position) => {
-                        const lat = position.coords.latitude;
-                        const lng = position.coords.longitude;
-                        updateLocation(lat, lng);
-                    },
-                    () => {
-                        alert("Geolocation failed.");
-                    },
-                    { enableHighAccuracy: true }
-                );
+                watchId = navigator.geolocation.watchPosition((position) => {
+                    const lat = position.coords.latitude;
+                    const lng = position.coords.longitude;
+                    db.ref("location").set({ lat, lng });
+                }, () => {
+                    alert("Geolocation failed.");
+                }, { enableHighAccuracy: true });
             } else {
                 alert("Geolocation is not supported by this browser.");
             }
+        }
+
+        function viewTracking() {
+            db.ref("location").on("value", (snapshot) => {
+                if (snapshot.exists()) {
+                    const { lat, lng } = snapshot.val();
+                    updateLocation(lat, lng);
+                }
+            });
         }
 
         function updateLocation(lat, lng) {
