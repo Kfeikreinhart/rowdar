@@ -1,3 +1,4 @@
+<!-- index.html -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -22,13 +23,10 @@
     <h1>Rowdar</h1>
     <h2>by CRLS Lemelson-MIT InvenTeam</h2>
     <button onclick="startTracking()">Start Tracking</button>
+    <a href="gps_view.html"><button>View Tracked Person</button></a>
     <div id="map"></div>
     <script>
-        let map;
-        let marker;
-        let watchId;
-        let path;
-        let pathCoordinates = [];
+        let map, marker, watchId;
 
         function initMap(lat = 42.372330, lng = -71.133632) {
             map = new google.maps.Map(document.getElementById("map"), {
@@ -39,17 +37,12 @@
                 position: { lat: lat, lng: lng },
                 map: map,
             });
-            path = new google.maps.Polyline({
-                path: pathCoordinates,
-                geodesic: true,
-                strokeColor: "#FF0000",
-                strokeOpacity: 1.0,
-                strokeWeight: 2,
-                map: map,
-            });
         }
 
         function startTracking() {
+            if (watchId) {
+                navigator.geolocation.clearWatch(watchId);
+            }
             if (navigator.geolocation) {
                 watchId = navigator.geolocation.watchPosition(
                     (position) => {
@@ -71,8 +64,7 @@
             const newPosition = { lat: lat, lng: lng };
             map.setCenter(newPosition);
             marker.setPosition(newPosition);
-            pathCoordinates.push(newPosition);
-            path.setPath(pathCoordinates);
+            localStorage.setItem("trackedLocation", JSON.stringify(newPosition));
         }
 
         window.onload = () => initMap();
