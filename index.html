@@ -20,6 +20,8 @@
         let map;
         let marker;
         let watchId;
+        let path;
+        let pathCoordinates = [];
 
         function initMap(lat = 42.3655, lng = -71.1089) {
             map = new google.maps.Map(document.getElementById("map"), {
@@ -28,6 +30,14 @@
             });
             marker = new google.maps.Marker({
                 position: { lat: lat, lng: lng },
+                map: map,
+            });
+            path = new google.maps.Polyline({
+                path: pathCoordinates,
+                geodesic: true,
+                strokeColor: "#FF0000",
+                strokeOpacity: 1.0,
+                strokeWeight: 2,
                 map: map,
             });
         }
@@ -54,10 +64,11 @@
             const newPosition = { lat: lat, lng: lng };
             map.setCenter(newPosition);
             marker.setPosition(newPosition);
+            pathCoordinates.push(newPosition);
+            path.setPath(pathCoordinates);
         }
 
         window.onload = () => initMap();
     </script>
 </body>
 </html>
-
