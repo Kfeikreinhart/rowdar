@@ -3,10 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Live GPS Tracking</title>
-    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDv-XXvnWnZ3_BW65BZMG6DYRFRFuQpdl4"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js"></script>
+    <title>GPS Location on Google Maps</title>
+    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDv-XXvnWnZ3_BW65BZMG6DYRFRFuQpdl4" defer></script>
     <style>
         body {
             background: linear-gradient(to bottom, black, grey);
@@ -17,44 +15,29 @@
         #map {
             width: 100%;
             height: 500px;
-            margin: 20px auto;
         }
     </style>
 </head>
 <body>
-    <h1>Live GPS Tracking</h1>
+    <h1>Rowdar</h1>
     <h2>by CRLS Lemelson-MIT InvenTeam</h2>
     <button onclick="startTracking()">Start Tracking</button>
-    <button onclick="viewTracking()">View Tracking</button>
     <div id="map"></div>
-    
     <script>
-        // Replace with your Firebase Config
-        const firebaseConfig = {
-            apiKey: "YOUR_API_KEY",
-            authDomain: "YOUR_AUTH_DOMAIN",
-            databaseURL: "YOUR_DATABASE_URL",
-            projectId: "YOUR_PROJECT_ID",
-            storageBucket: "YOUR_STORAGE_BUCKET",
-            messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-            appId: "YOUR_APP_ID"
-        };
-        
-        firebase.initializeApp(firebaseConfig);
-        const db = firebase.database();
-
-        let map, marker, path;
-        let pathCoordinates = [];
+        let map;
+        let marker;
         let watchId;
+        let path;
+        let pathCoordinates = [];
 
-        function initMap() {
+        function initMap(lat = 42.3655, lng = -71.1089) {
             map = new google.maps.Map(document.getElementById("map"), {
-                center: { lat: 42.3655, lng: -71.1089 },
+                center: { lat: lat, lng: lng },
                 zoom: 15,
             });
             marker = new google.maps.Marker({
+                position: { lat: lat, lng: lng },
                 map: map,
-                position: { lat: 42.3655, lng: -71.1089 }
             });
             path = new google.maps.Polyline({
                 path: pathCoordinates,
@@ -68,26 +51,20 @@
 
         function startTracking() {
             if (navigator.geolocation) {
-                watchId = navigator.geolocation.watchPosition((position) => {
-                    const lat = position.coords.latitude;
-                    const lng = position.coords.longitude;
-                    db.ref("location").set({ lat, lng });
-                }, (error) => {
-                    console.error("Geolocation error: ", error);
-                    alert("Geolocation failed.");
-                }, { enableHighAccuracy: true });
+                watchId = navigator.geolocation.watchPosition(
+                    (position) => {
+                        const lat = position.coords.latitude;
+                        const lng = position.coords.longitude;
+                        updateLocation(lat, lng);
+                    },
+                    () => {
+                        alert("Geolocation failed.");
+                    },
+                    { enableHighAccuracy: true }
+                );
             } else {
                 alert("Geolocation is not supported by this browser.");
             }
-        }
-
-        function viewTracking() {
-            db.ref("location").on("value", (snapshot) => {
-                if (snapshot.exists()) {
-                    const { lat, lng } = snapshot.val();
-                    updateLocation(lat, lng);
-                }
-            });
         }
 
         function updateLocation(lat, lng) {
@@ -98,7 +75,7 @@
             path.setPath(pathCoordinates);
         }
 
-        window.onload = initMap;
+        window.onload = () => initMap();
     </script>
 </body>
 </html>
