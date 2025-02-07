@@ -18,23 +18,12 @@
             width: 100%;
             height: 500px;
         }
-        .boat-buttons button {
-            margin: 10px;
-            padding: 10px;
-            font-size: 16px;
-            cursor: pointer;
-        }
     </style>
 </head>
 <body>
     <h1>Rowdar</h1>
     <h2>by CRLS Lemelson-MIT InvenTeam</h2>
-    <div class="boat-buttons">
-        <button id="blue-boat" onclick="startTracking('blue')">Blue Boat</button>
-        <button id="yellow-boat" onclick="startTracking('yellow')">Yellow Boat</button>
-        <button id="green-boat" onclick="startTracking('green')">Green Boat</button>
-        <button id="red-boat" onclick="startTracking('red')">Red Boat</button>
-    </div>
+    <button onclick="startTracking()">Start Tracking</button>
     <a href="gps_view.html"><button>View Tracked Person</button></a>
     <div id="map"></div>
     <script>
@@ -44,34 +33,33 @@
             uuid: "tracker-device"
         });
         const CHANNEL_NAME = "gps_tracking";
-        
+
         let map, marker, watchId;
-        let selectedBoat = null;
-        let boatIcons = {
-            'blue': 'https://example.com/blue_boat.png',
-            'yellow': 'path/to/yellow_boat.png',
-            'green': 'path/to/green_boat.png',
-            'red': 'path/to/red_boat.png'
-        };
-        
+        let lastUpdate = 0;
+
         function initMap(lat = 42.372330, lng = -71.133632) {
             map = new google.maps.Map(document.getElementById("map"), {
                 center: { lat: lat, lng: lng },
                 zoom: 15,
             });
-        }
-        
-        function startTracking(color) {
-            if (selectedBoat) return;
-            selectedBoat = color;
-            
+            marker = new google.maps.Marker({
+                position: { lat: lat, lng: lng },
+                map: map,
+            });
+        } 
+
+        function startTracking() {
             if (watchId) {
                 navigator.geolocation.clearWatch(watchId);
             }
             if (navigator.geolocation) {
                 watchId = navigator.geolocation.watchPosition(
                     (position) => {
-                        updateLocation(position.coords.latitude, position.coords.longitude);
+                        const now = Date.now();
+                        if (now - lastUpdate > 1000) { // Update every second
+                            updateLocation(position.coords.latitude, position.coords.longitude);
+                            lastUpdate = now;
+                        }
                     },
                     () => {
                         alert("Geolocation failed.");
@@ -82,27 +70,19 @@
                 alert("Geolocation is not supported by this browser.");
             }
         }
-        
+
         function updateLocation(lat, lng) {
-            const newPosition = { lat: lat, lng: lng, boat: selectedBoat };
+            const newPosition = { lat: lat, lng: lng };
             map.setCenter(newPosition);
+            marker.setPosition(newPosition);
             
-            if (!marker) {
-                marker = new google.maps.Marker({
-                    position: newPosition,
-                    map: map,
-                    icon: boatIcons[selectedBoat]
-                });
-            } else {
-                marker.setPosition(newPosition);
-            }
-            
+            // Publish location to PubNub
             pubnub.publish({
                 channel: CHANNEL_NAME,
                 message: newPosition
             });
         }
-        
+
         window.onload = () => initMap();
     </script>
 </body>
