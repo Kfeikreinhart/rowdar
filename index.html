@@ -43,9 +43,10 @@
                 zoom: 15,
             });
             marker = new google.maps.Marker({
-                position: { lat: lat, lng: lng },
-                map: map,
-            });
+    position: { lat: lat, lng: lng },
+    map: map,
+    icon: "boat.png" // Replace with actual path
+});
         } 
 
         function startTracking() {
