@@ -1,4 +1,4 @@
-<!-- gps_view.html -->
+<!-- Updated gps_view.html -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -21,7 +21,7 @@
     </style>
 </head>
 <body>
-    <h1>Tracked Person's Location</h1>
+    <h1>Tracked Boats' Locations</h1>
     <div id="map"></div>
     <script>
         const pubnub = new PubNub({
@@ -30,17 +30,19 @@
             uuid: "viewer-device"
         });
         const CHANNEL_NAME = "gps_tracking";
-        
-        let map, marker;
+        let map;
+        let boatIcons = {
+            "blue": "blue_boat.png",
+            "yellow": "yellow_boat.png",
+            "green": "green_boat.png",
+            "red": "red_boat.png"
+        };
+        let boatMarkers = {};
 
         function initMap() {
             map = new google.maps.Map(document.getElementById("map"), {
                 center: { lat: 42.372330, lng: -71.133632 },
                 zoom: 15,
-            });
-            marker = new google.maps.Marker({
-                position: { lat: 42.372330, lng: -71.133632 },
-                map: map,
             });
         }
 
@@ -49,10 +51,17 @@
             
             pubnub.addListener({
                 message: function(event) {
-                    const { lat, lng } = event.message;
-                    const newPosition = { lat: lat, lng: lng };
-                    map.setCenter(newPosition);
-                    marker.setPosition(newPosition);
+                    const { lat, lng, color } = event.message;
+                    if (!boatMarkers[color]) {
+                        boatMarkers[color] = new google.maps.Marker({
+                            position: { lat: lat, lng: lng },
+                            map: map,
+                            icon: boatIcons[color]
+                        });
+                    } else {
+                        boatMarkers[color].setPosition({ lat: lat, lng: lng });
+                    }
+                    map.setCenter({ lat: lat, lng: lng });
                 }
             });
         }
