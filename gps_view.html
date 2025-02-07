@@ -2,11 +2,11 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <script src="https://cdn.pubnub.com/sdk/javascript/pubnub.4.29.9.min.js"></script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>GPS Viewer</title>
-    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDv-XXvnWnZ3_BW65BZMG6DYRFRFuQpdl4" defer></script>
+    <script src="https://maps.googleapis.com/maps/api/js?key=YOUR_API_KEY" defer></script>
+    <script src="https://cdn.pubnub.com/sdk/javascript/pubnub.4.29.9.min.js"></script>
     <style>
         body {
             background: linear-gradient(to bottom, black, grey);
@@ -21,9 +21,16 @@
     </style>
 </head>
 <body>
-    <h1>Tracked Boats's Location</h1>
+    <h1>Tracked Person's Location</h1>
     <div id="map"></div>
     <script>
+        const pubnub = new PubNub({
+            publishKey: "pub-c-b34ec225-e227-4a75-b8b7-45958644f07f",
+            subscribeKey: "sub-c-1a48de9d-bfef-4c59-b911-5f400664dc60",
+            uuid: "viewer-device"
+        });
+        const CHANNEL_NAME = "gps_tracking";
+        
         let map, marker;
 
         function initMap() {
@@ -38,17 +45,21 @@
         }
 
         function fetchLocation() {
-            const storedLocation = JSON.parse(localStorage.getItem("trackedLocation"));
-            if (storedLocation) {
-                const newPosition = { lat: storedLocation.lat, lng: storedLocation.lng };
-                map.setCenter(newPosition);
-                marker.setPosition(newPosition);
-            }
+            pubnub.subscribe({ channels: [CHANNEL_NAME] });
+            
+            pubnub.addListener({
+                message: function(event) {
+                    const { lat, lng } = event.message;
+                    const newPosition = { lat: lat, lng: lng };
+                    map.setCenter(newPosition);
+                    marker.setPosition(newPosition);
+                }
+            });
         }
 
         window.onload = () => {
             initMap();
-            setInterval(fetchLocation, 5000); // Fetch location every 5 seconds
+            fetchLocation();
         };
     </script>
 </body>
