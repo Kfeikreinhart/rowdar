@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>GPS Viewer</title>
-    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDv-XXvnWnZ3_BW65BZMG6DYRFRFuQpdl4" defer></script>
+    <script src="https://maps.googleapis.com/maps/api/js?key=YOUR_API_KEY" defer></script>
     <script src="https://cdn.pubnub.com/sdk/javascript/pubnub.4.29.9.min.js"></script>
     <style>
         body {
@@ -21,7 +21,7 @@
     </style>
 </head>
 <body>
-    <h1>Tracked Boats' Locations</h1>
+    <h1>Tracked Person's Location</h1>
     <div id="map"></div>
     <script>
         const pubnub = new PubNub({
@@ -31,43 +31,32 @@
         });
         const CHANNEL_NAME = "gps_tracking";
         
-        let map;
-        let markers = {};
-        let boatIcons = {
-            'blue': 'path/to/blue_boat.png',
-            'yellow': 'path/to/yellow_boat.png',
-            'green': 'path/to/green_boat.png',
-            'red': 'path/to/red_boat.png'
-        };
-        
+        let map, marker;
+
         function initMap() {
             map = new google.maps.Map(document.getElementById("map"), {
                 center: { lat: 42.372330, lng: -71.133632 },
                 zoom: 15,
             });
+            marker = new google.maps.Marker({
+                position: { lat: 42.372330, lng: -71.133632 },
+                map: map,
+            });
         }
-        
+
         function fetchLocation() {
             pubnub.subscribe({ channels: [CHANNEL_NAME] });
             
             pubnub.addListener({
                 message: function(event) {
-                    const { lat, lng, boat } = event.message;
+                    const { lat, lng } = event.message;
                     const newPosition = { lat: lat, lng: lng };
-                    
-                    if (!markers[boat]) {
-                        markers[boat] = new google.maps.Marker({
-                            position: newPosition,
-                            map: map,
-                            icon: boatIcons[boat]
-                        });
-                    } else {
-                        markers[boat].setPosition(newPosition);
-                    }
+                    map.setCenter(newPosition);
+                    marker.setPosition(newPosition);
                 }
             });
         }
-        
+
         window.onload = () => {
             initMap();
             fetchLocation();
