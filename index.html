@@ -1,29 +1,78 @@
-<!-- index.html -->
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>RowDar</title>
-    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDv-XXvnWnZ3_BW65BZMG6DYRFRFuQpdl4" defer></script>
-    <script src="https://cdn.pubnub.com/sdk/javascript/pubnub.4.29.9.min.js"></script>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Geologica:wght@100..900&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css">
-    <link rel="icon" type="image/x-icon" href="boat.png">
+  <title>Live GPS Tracker</title>
+  <meta name="viewport" content="initial-scale=1.0">
+  <meta charset="utf-8">
+  <style>
+    html, body {
+      height: 100%;
+      margin: 0;
+      padding: 0;
+    }
+    #map {
+      height: 100%;
+    }
+  </style>
+
+  <!-- Google Maps JS API -->
+  <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDv-XXvnWnZ3_BW65BZMG6DYRFRFuQpdl4"></script>
+
+  <!-- PubNub JS SDK -->
+  <script src="https://cdn.pubnub.com/sdk/javascript/pubnub.7.2.2.min.js"></script>
 </head>
+
 <body>
-    <header class="text"> 
-        <h1>RowDar</h1>
-        <h2>CRLS Lemelson-MIT InvenTeam</h2>
-        
-        <div class="buttons">
-            <button onclick="startTracking()">Start Tracking</button>
-            <a href="gps_view.html"><button>View Tracked Boat</button></a>
-        </div>
-    </header>
-    <div id="map"></div>
-    <script src="script.js"></script>
+  <div id="map"></div>
+
+  <script>
+    // === Replace these with your keys ===
+    const pubnub = new PubNub({
+      publishKey: 'pub-c-b34ec225-e227-4a75-b8b7-45958644f07f',
+      subscribeKey: 'sub-c-1a48de9d-bfef-4c59-b911-5f400664dc60',
+      uuid: 'web-tracker'
+    });
+
+    const channel = 'gps-tracker';
+
+    let map;
+    let marker;
+
+    function initMap() {
+      // Default location if no data yet
+      const defaultLoc = { lat: 0, lng: 0 };
+
+      map = new google.maps.Map(document.getElementById('map'), {
+        center: defaultLoc,
+        zoom: 2
+      });
+
+      marker = new google.maps.Marker({
+        position: defaultLoc,
+        map: map,
+        title: "GPS Tracker"
+      });
+    }
+
+    // Initialize map
+    initMap();
+
+    // Listen for GPS data on PubNub
+    pubnub.subscribe({ channels: [channel] });
+
+    pubnub.addListener({
+      message: function(event) {
+        const { latitude, longitude } = event.message;
+
+        if (latitude && longitude) {
+          const newPos = { lat: latitude, lng: longitude };
+
+          marker.setPosition(newPos);
+          map.setCenter(newPos);
+          map.setZoom(16); // Zoom in on location
+        }
+      }
+    });
+  </script>
 </body>
 </html>
