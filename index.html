@@ -2,116 +2,126 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Rowdar - Live GPS Tracker</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <!-- Leaflet CSS -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css"
-    integrity="sha256-s4gB5e6ccnBXX57wO0/JDG0DbdKNR4F1E1poVYPCxD0=" crossorigin=""/>
+  <title>RowDar Coach's Interface & Live GPS Tracker</title>
+  
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap" rel="stylesheet">
+  
+  <!-- Inline CSS for styling -->
   <style>
-    /* Reset & basic styling */
+    /* Reset and base settings */
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
     html, body {
       height: 100%;
-      margin: 0;
-      font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+      font-family: 'Inter', sans-serif;
+      background: #f0f2f5;
+      color: #333;
     }
-    /* The full-screen map container */
+    header {
+      background-color: #4a90e2;
+      color: #fff;
+      padding: 20px;
+      text-align: center;
+    }
+    main {
+      display: flex;
+      flex-direction: column;
+      height: calc(100% - 80px); /* Adjusting for header */
+    }
+    #map-container {
+      flex: 1;
+      position: relative;
+    }
     #map {
       width: 100%;
       height: 100%;
     }
-    /* A header overlay for the title */
-    #header {
-      position: absolute;
-      top: 0;
-      width: 100%;
-      background: rgba(0, 0, 0, 0.5);
-      color: #f0f0f0;
-      padding: 15px;
+    .audio-container {
+      background: #fff;
+      padding: 20px;
       text-align: center;
-      z-index: 1000;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.4);
-      font-size: 1.5em;
+      box-shadow: 0 -2px 5px rgba(0, 0, 0, 0.1);
     }
-    /* An information box for the current coordinates */
-    #info {
-      position: absolute;
-      bottom: 20px;
-      left: 20px;
-      background: rgba(255, 255, 255, 0.9);
-      padding: 10px 15px;
-      border-radius: 5px;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.3);
-      z-index: 1000;
-      font-size: 1em;
+    audio {
+      width: 100%;
+      max-width: 500px;
+      outline: none;
     }
   </style>
+  
+  <!-- Google Maps JS API -->
+  <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDv-XXvnWnZ3_BW65BZMG6DYRFRFuQpdl4"></script>
+  
+  <!-- PubNub JS SDK -->
+  <script src="https://cdn.pubnub.com/sdk/javascript/pubnub.7.2.2.min.js"></script>
 </head>
 <body>
-  <div id="header">Rowdar - Live GPS Tracker</div>
-  <div id="map"></div>
-  <div id="info">Waiting for location data...</div>
-
-  <!-- Leaflet JS -->
-  <script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js"
-    integrity="sha256-DaUVeIdBKE2U/6DUDdBahuFLBE6vVYVGCbVxT4VxS2U=" crossorigin=""></script>
-  <!-- PubNub JS SDK -->
-  <script src="https://cdn.pubnub.com/sdk/javascript/pubnub.4.34.0.min.js"></script>
-
+  <!-- Header Section -->
+  <header>
+    <h1>RowDar Coach's Interface & Live GPS Tracker</h1>
+  </header>
+  
+  <!-- Main Content Area -->
+  <main>
+    <!-- Map Container -->
+    <div id="map-container">
+      <div id="map"></div>
+    </div>
+    <!-- Audio Stream Container -->
+    <div class="audio-container">
+      <audio id="piStream" src="http://104.131.48.33:8000/live.mp3" controls autoplay></audio>
+    </div>
+  </main>
+  
+  <!-- Scripts for Map and PubNub functionality -->
   <script>
-    // Initialize the Leaflet map
-    var map = L.map('map').setView([0, 0], 2);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '&copy; OpenStreetMap contributors'
-    }).addTo(map);
-
-    // Marker to be added once data is received
-    var marker = null;
-
-    /**
-     * Update the marker on the map with the new GPS coordinates.
-     * Centers the map and updates the info box.
-     *
-     * @param {number} lat - The latitude value.
-     * @param {number} lng - The longitude value.
-     */
-    function updateMarker(lat, lng) {
-      var newLatLng = new L.LatLng(lat, lng);
-      if (marker === null) {
-        marker = L.marker(newLatLng).addTo(map);
-      } else {
-        marker.setLatLng(newLatLng);
-      }
-      map.setView(newLatLng, 16);
-      document.getElementById("info").innerHTML = 
-        "Latitude: " + lat.toFixed(5) + ", Longitude: " + lng.toFixed(5);
+    // Initialize PubNub with your keys and identifier
+    const pubnub = new PubNub({
+      publishKey: 'pub-c-b34ec225-e227-4a75-b8b7-45958644f07f',
+      subscribeKey: 'sub-c-1a48de9d-bfef-4c59-b911-5f400664dc60',
+      uuid: 'web-tracker'
+    });
+  
+    const channel = 'gps-tracker';
+  
+    let map;
+    let marker;
+  
+    // Initialize the Google Map with a default location
+    function initMap() {
+      const defaultLoc = { lat: 0, lng: 0 };
+      map = new google.maps.Map(document.getElementById('map'), {
+        center: defaultLoc,
+        zoom: 2
+      });
+      marker = new google.maps.Marker({
+        position: defaultLoc,
+        map: map,
+        title: "GPS Tracker"
+      });
     }
-
-    // PubNub configuration – replace these keys with your actual keys.
-    var pubnub = new PubNub({
-      publishKey: 'YOUR_PUBLISH_KEY',
-      subscribeKey: 'YOUR_SUBSCRIBE_KEY',
-      uuid: 'rowdar-web'
-    });
-
-    // Subscribe to the "gps" channel (adjust the channel name if needed)
-    pubnub.subscribe({
-      channels: ['gps']
-    });
-
-    // Listen for incoming messages on the PubNub channel.
+  
+    // Call map initialization
+    initMap();
+  
+    // Subscribe to the PubNub channel for receiving GPS data
+    pubnub.subscribe({ channels: [channel] });
+  
     pubnub.addListener({
       message: function(event) {
-        var message = event.message;
-        // Expecting message to contain lat and lng properties
-        if (message && typeof message.lat !== 'undefined' && typeof message.lng !== 'undefined') {
-          updateMarker(parseFloat(message.lat), parseFloat(message.lng));
-        } else {
-          console.warn("Received a message without valid lat/lng properties:", message);
-        }
-      },
-      status: function(statusEvent) {
-        if (statusEvent.category === "PNConnectedCategory") {
-          console.log("Connected to PubNub channel: gps");
+        const { latitude, longitude } = event.message;
+        if (latitude && longitude) {
+          const newPos = { lat: latitude, lng: longitude };
+          marker.setPosition(newPos);
+          map.setCenter(newPos);
+          map.setZoom(16);  // Zoom in on the new location
         }
       }
     });
