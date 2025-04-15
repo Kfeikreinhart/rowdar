@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>RowDar Crew Interface & GPS Tracker</title>
+  <title>RowDar Crew Interface & Live GPS Tracker</title>
   
-  <!-- Google Fonts: Using Inter for a modern look -->
+  <!-- Google Fonts: Using Inter -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap" rel="stylesheet">
   
-  <!-- Inline CSS with crew themed design -->
+  <!-- Inline CSS with crew-themed styles -->
   <style>
     /* Reset and base styles */
     * {
@@ -18,44 +18,39 @@
       padding: 0;
       box-sizing: border-box;
     }
-
-    body {
+    html, body {
+      height: 100%;
       font-family: 'Inter', sans-serif;
-      background: #0d2538;  /* Deep navy reminiscent of the open ocean */
-      color: #f0f2f5;
-      overflow: hidden;
     }
-
+    body {
+      background: #0d2538; /* Deep navy for an ocean feel */
+      color: #f0f2f5;
+    }
     header {
-      background: #1b3a5d; /* Darker navy, evoking a ship's bridge */
+      background: #1b3a5d; /* Darker navy reminiscent of a ship's bridge */
       text-align: center;
       padding: 20px;
       border-bottom: 2px solid #3a6ea5;
     }
-
     header h1 {
       font-size: 1.8rem;
       letter-spacing: 1px;
     }
-
-    /* Layout: two side-by-side columns */
+    /* Two side-by-side panels */
     .container {
       display: flex;
-      height: calc(100vh - 80px); /* Subtracting header height */
+      height: calc(100vh - 80px); /* Deduct header height */
     }
-
     /* Left panel for the map */
     .panel-map {
       flex: 2;
       border-right: 2px solid #3a6ea5;
       position: relative;
     }
-
     #map {
       width: 100%;
       height: 100%;
     }
-
     /* Right panel for communication */
     .panel-comm {
       flex: 1;
@@ -66,37 +61,25 @@
       justify-content: center;
       padding: 20px;
     }
-
-    /* Styling the audio stream player */
-    .audio-container {
-      background: #1b3a5d;
-      padding: 20px;
-      border-radius: 8px;
-      box-shadow: 0 0 10px rgba(0,0,0,0.3);
+    /* Communication content styling */
+    .comm-content {
+      width: 100%;
+      max-width: 400px;
       text-align: center;
-      width: 100%;
-      max-width: 350px;
     }
-
-    audio {
-      width: 100%;
-      outline: none;
-      margin-top: 10px;
-    }
-
-    /* Crew-themed decoration (simple nautical icons using Unicode) */
-    .crew-header {
-      font-size: 1.2rem;
+    .comm-title {
       margin-bottom: 15px;
+      font-size: 1.2rem;
     }
-    .crew-header::before {
-      content: "\2693"; /* Anchor symbol */
+    /* Crew-themed icon (anchor) added before the title */
+    .comm-title::before {
+      content: "\2693";
       margin-right: 8px;
       color: #3a6ea5;
     }
   </style>
   
-  <!-- Google Maps API -->
+  <!-- Google Maps JS API -->
   <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDv-XXvnWnZ3_BW65BZMG6DYRFRFuQpdl4"></script>
   
   <!-- PubNub JS SDK -->
@@ -108,7 +91,7 @@
     <h1>RowDar Crew Interface & Live GPS Tracker</h1>
   </header>
   
-  <!-- Main Container with two panels -->
+  <!-- Main container with two side-by-side panels -->
   <div class="container">
     <!-- Map Panel -->
     <div class="panel-map">
@@ -117,36 +100,32 @@
     
     <!-- Communication Panel -->
     <div class="panel-comm">
-      <div class="audio-container">
-        <div class="crew-header">Live Audio Feed</div>
+      <div class="comm-content">
+        <div class="comm-title">Live Audio Feed</div>
+        <!-- EXACTLY as provided in your code -->
         <audio id="piStream" src="http://104.131.48.33:8000/live.mp3" controls autoplay></audio>
       </div>
     </div>
   </div>
   
-  <!-- Scripts for Map and PubNub functionality -->
+  <!-- Scripts for map & PubNub functionality -->
   <script>
-    // Initialize PubNub with your keys and identifier.
+    // Initialize PubNub with your keys and identifier
     const pubnub = new PubNub({
       publishKey: 'pub-c-b34ec225-e227-4a75-b8b7-45958644f07f',
       subscribeKey: 'sub-c-1a48de9d-bfef-4c59-b911-5f400664dc60',
       uuid: 'web-tracker'
     });
-
     const channel = 'gps-tracker';
-
-    let map;
-    let marker;
-
-    // Initialize the Google Map with a default location.
+    let map, marker;
+    
+    // Initialize the Google Map with a default location
     function initMap() {
       const defaultLoc = { lat: 0, lng: 0 };
-
       map = new google.maps.Map(document.getElementById('map'), {
         center: defaultLoc,
         zoom: 2,
-        styles: [ 
-          // Optional: Some Google Maps style to match the dark (crew) theme.
+        styles: [
           { elementType: 'geometry', stylers: [{color: '#242f3e'}] },
           { elementType: 'labels.text.stroke', stylers: [{color: '#242f3e'}] },
           { elementType: 'labels.text.fill', stylers: [{color: '#746855'}] },
@@ -167,33 +146,24 @@
           { featureType: 'water', elementType: 'labels.text.stroke', stylers: [{color: '#17263c'}] }
         ]
       });
-
       marker = new google.maps.Marker({
         position: defaultLoc,
         map: map,
         title: "GPS Tracker"
       });
     }
-
-    // Initialize the map on page load.
+    
+    // Initialize the map on page load
     initMap();
-
-    // Subscribe to the PubNub channel for receiving GPS data.
+    
+    // Subscribe to the PubNub channel for receiving GPS data
     pubnub.subscribe({ channels: [channel] });
-
+    
     pubnub.addListener({
       message: function(event) {
         const { latitude, longitude } = event.message;
-
         if (latitude && longitude) {
           const newPos = { lat: latitude, lng: longitude };
-
           marker.setPosition(newPos);
           map.setCenter(newPos);
-          map.setZoom(16); // Zoom in on location.
-        }
-      }
-    });
-  </script>
-</body>
-</html>
+          map.setZoom
