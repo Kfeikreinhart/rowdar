@@ -1,75 +1,117 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>Live GPS Tracker</title>
-  <meta name="viewport" content="initial-scale=1.0">
-  <meta charset="utf-8">
+  <meta charset="UTF-8">
+  <title>Rowdar - Live GPS Tracker</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css"
+    integrity="sha256-s4gB5e6ccnBXX57wO0/JDG0DbdKNR4F1E1poVYPCxD0=" crossorigin=""/>
   <style>
+    /* Reset & basic styling */
     html, body {
       height: 100%;
       margin: 0;
-      padding: 0;
+      font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
     }
+    /* The full-screen map container */
     #map {
+      width: 100%;
       height: 100%;
     }
+    /* A header overlay for the title */
+    #header {
+      position: absolute;
+      top: 0;
+      width: 100%;
+      background: rgba(0, 0, 0, 0.5);
+      color: #f0f0f0;
+      padding: 15px;
+      text-align: center;
+      z-index: 1000;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.4);
+      font-size: 1.5em;
+    }
+    /* An information box for the current coordinates */
+    #info {
+      position: absolute;
+      bottom: 20px;
+      left: 20px;
+      background: rgba(255, 255, 255, 0.9);
+      padding: 10px 15px;
+      border-radius: 5px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+      z-index: 1000;
+      font-size: 1em;
+    }
   </style>
-
-  <!-- Google Maps JS API -->
-  <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDv-XXvnWnZ3_BW65BZMG6DYRFRFuQpdl4"></script>
-
-  <!-- PubNub JS SDK -->
-  <script src="https://cdn.pubnub.com/sdk/javascript/pubnub.7.2.2.min.js"></script>
 </head>
-
 <body>
+  <div id="header">Rowdar - Live GPS Tracker</div>
   <div id="map"></div>
+  <div id="info">Waiting for location data...</div>
+
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js"
+    integrity="sha256-DaUVeIdBKE2U/6DUDdBahuFLBE6vVYVGCbVxT4VxS2U=" crossorigin=""></script>
+  <!-- PubNub JS SDK -->
+  <script src="https://cdn.pubnub.com/sdk/javascript/pubnub.4.34.0.min.js"></script>
 
   <script>
-    // === Replace these with your keys ===
-    const pubnub = new PubNub({
-      publishKey: 'pub-c-b34ec225-e227-4a75-b8b7-45958644f07f',
-      subscribeKey: 'sub-c-1a48de9d-bfef-4c59-b911-5f400664dc60',
-      uuid: 'web-tracker'
-    });
+    // Initialize the Leaflet map
+    var map = L.map('map').setView([0, 0], 2);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(map);
 
-    const channel = 'gps-tracker';
+    // Marker to be added once data is received
+    var marker = null;
 
-    let map;
-    let marker;
-
-    function initMap() {
-      // Default location if no data yet
-      const defaultLoc = { lat: 0, lng: 0 };
-
-      map = new google.maps.Map(document.getElementById('map'), {
-        center: defaultLoc,
-        zoom: 2
-      });
-
-      marker = new google.maps.Marker({
-        position: defaultLoc,
-        map: map,
-        title: "GPS Tracker"
-      });
+    /**
+     * Update the marker on the map with the new GPS coordinates.
+     * Centers the map and updates the info box.
+     *
+     * @param {number} lat - The latitude value.
+     * @param {number} lng - The longitude value.
+     */
+    function updateMarker(lat, lng) {
+      var newLatLng = new L.LatLng(lat, lng);
+      if (marker === null) {
+        marker = L.marker(newLatLng).addTo(map);
+      } else {
+        marker.setLatLng(newLatLng);
+      }
+      map.setView(newLatLng, 16);
+      document.getElementById("info").innerHTML = 
+        "Latitude: " + lat.toFixed(5) + ", Longitude: " + lng.toFixed(5);
     }
 
-    // Initialize map
-    initMap();
+    // PubNub configuration – replace these keys with your actual keys.
+    var pubnub = new PubNub({
+      publishKey: 'YOUR_PUBLISH_KEY',
+      subscribeKey: 'YOUR_SUBSCRIBE_KEY',
+      uuid: 'rowdar-web'
+    });
 
-    // Listen for GPS data on PubNub
-    pubnub.subscribe({ channels: [channel] });
+    // Subscribe to the "gps" channel (adjust the channel name if needed)
+    pubnub.subscribe({
+      channels: ['gps']
+    });
 
+    // Listen for incoming messages on the PubNub channel.
     pubnub.addListener({
       message: function(event) {
-        const { latitude, longitude } = event.message;
-
-        if (latitude && longitude) {
-          const newPos = { lat: latitude, lng: longitude };
-
-          marker.setPosition(newPos);
-          map.setCenter(newPos);
-          map.setZoom(16); // Zoom in on location
+        var message = event.message;
+        // Expecting message to contain lat and lng properties
+        if (message && typeof message.lat !== 'undefined' && typeof message.lng !== 'undefined') {
+          updateMarker(parseFloat(message.lat), parseFloat(message.lng));
+        } else {
+          console.warn("Received a message without valid lat/lng properties:", message);
+        }
+      },
+      status: function(statusEvent) {
+        if (statusEvent.category === "PNConnectedCategory") {
+          console.log("Connected to PubNub channel: gps");
         }
       }
     });
