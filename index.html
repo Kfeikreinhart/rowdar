@@ -1,207 +1,126 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>RowDar Crew Interface & GPS Tracker</title>
-  
-  <!-- Google Fonts: Using Inter for a modern look -->
+  <title>RowDar Coaches' Interface</title>
+  <link rel="stylesheet" href="style.css">
+
+  <!-- Google Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap" rel="stylesheet">
-  
-  <!-- Inline CSS with crew themed design -->
-  <style>
-    /* Reset and base styles */
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
-    body {
-      font-family: 'Inter', sans-serif;
-      background: #0d2538;
-      color: #f0f2f5;
-      overflow: hidden;
-    }
-    header {
-      background: #1b3a5d;
-      text-align: center;
-      padding: 20px;
-      border-bottom: 2px solid #3a6ea5;
-    }
-    header h1 {
-      font-size: 1.8rem;
-      letter-spacing: 1px;
-    }
-    .container {
-      display: flex;
-      height: calc(100vh - 80px);
-    }
-    .panel-map {
-      flex: 2;
-      border-right: 2px solid #3a6ea5;
-      position: relative;
-    }
-    #map {
-      width: 100%;
-      height: 100%;
-    }
-    .panel-comm {
-      flex: 1;
-      background: #112c43;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      padding: 20px;
-    }
-    .audio-container {
-      background: #1b3a5d;
-      padding: 20px;
-      border-radius: 8px;
-      box-shadow: 0 0 10px rgba(0,0,0,0.3);
-      text-align: center;
-      width: 100%;
-      max-width: 350px;
-    }
-    audio {
-      width: 100%;
-      outline: none;
-      margin-top: 10px;
-    }
-    .crew-header {
-      font-size: 1.2rem;
-      margin-bottom: 15px;
-    }
-    .crew-header::before {
-      content: "\2693";
-      margin-right: 8px;
-      color: #3a6ea5;
-    }
-    /* Style for the play button */
-    .play-button {
-      background: #3a6ea5;
-      color: #fff;
-      border: none;
-      border-radius: 4px;
-      padding: 10px 15px;
-      cursor: pointer;
-      font-size: 1rem;
-      margin-top: 15px;
-      transition: background 0.3s ease;
-    }
-    .play-button:hover {
-      background: #2d568c;
-    }
-  </style>
-  
-  <!-- Google Maps API -->
+
+  <!-- Google Maps -->
   <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDv-XXvnWnZ3_BW65BZMG6DYRFRFuQpdl4"></script>
-  
-  <!-- PubNub JS SDK -->
+
+  <!-- PubNub -->
   <script src="https://cdn.pubnub.com/sdk/javascript/pubnub.7.2.2.min.js"></script>
+
+  <!-- Socket.IO -->
+  <script src="/socket.io/socket.io.js"></script>
 </head>
+
 <body>
-  <!-- Header Section -->
   <header>
-    <h1>RowDar Crew Interface & Live GPS Tracker</h1>
+    <h1>RowDar Coaches' Interface</h1>
   </header>
-  
-  <!-- Main Container with two panels -->
+
   <div class="container">
-    <!-- Map Panel -->
-    <div class="panel-map">
+    <section class="mapHalf">
+      <h1>Live Map Data</h1>
       <div id="map"></div>
-    </div>
-    
-    <!-- Communication Panel -->
-    <div class="panel-comm">
-      <div class="audio-container">
-        <div class="crew-header">Live Audio Feed</div>
-        <audio id="piStream" src="http://104.131.48.33:8000/live.mp3" controls></audio>
-        <button class="play-button" onclick="playAudio()">Play Audio</button>
-        <p style="font-size: 0.9rem; margin-top: 10px;">
-          Note: If using HTTPS, ensure your audio stream isn't blocked as mixed-content.
-        </p>
-      </div>
-    </div>
+    </section>
+
+    <section class="livestreamHalf">
+      <h1>Live Audio Stream</h1>
+      <audio id="audio" autoplay controls playsinline muted></audio>
+
+      <script>
+        const socket = io();
+        const pc = new RTCPeerConnection();
+        const audio = document.getElementById("audio");
+
+        pc.ontrack = (event) => {
+          console.log("✅ Received track event");
+          audio.srcObject = event.streams[0];
+          audio.play().then(() => {
+            console.log("🔊 Audio is playing");
+          }).catch(err => {
+            console.error("❌ audio.play() failed:", err);
+          });
+        };
+
+        pc.oniceconnectionstatechange = () => {
+          console.log("ICE state:", pc.iceConnectionState);
+        };
+
+        pc.onicecandidate = (event) => {
+          if (event.candidate) {
+            socket.emit("ice-candidate", event.candidate);
+            console.log("📤 Sent ICE candidate");
+          }
+        };
+
+        socket.on("ice-candidate", (candidate) => {
+          console.log("📥 Received ICE candidate");
+          pc.addIceCandidate(candidate);
+        });
+
+        socket.on("offer", async (offer) => {
+          console.log("📡 Got offer");
+          await pc.setRemoteDescription(offer);
+          const answer = await pc.createAnswer();
+          await pc.setLocalDescription(answer);
+          socket.emit("answer", pc.localDescription);
+          console.log("📨 Sent answer");
+        });
+      </script>
+    </section>
   </div>
-  
-  <!-- Scripts for Map, Audio, and PubNub functionality -->
+
+  <!-- Map & GPS Script -->
   <script>
-    // Initialize PubNub with your keys and identifier
     const pubnub = new PubNub({
       publishKey: 'pub-c-b34ec225-e227-4a75-b8b7-45958644f07f',
       subscribeKey: 'sub-c-1a48de9d-bfef-4c59-b911-5f400664dc60',
       uuid: 'web-tracker'
     });
-  
+
     const channel = 'gps-tracker';
-    let map;
-    let marker;
-  
-    // Initialize the Google Map with a default location
+    let map, marker;
+
     function initMap() {
-      const defaultLoc = { lat: 42.372240525186385, lng: -71.1336323150142};
-  
+      const defaultLoc = { lat: 42.372240525186385, lng: -71.1336323150142 };
       map = new google.maps.Map(document.getElementById('map'), {
         center: defaultLoc,
         zoom: 2,
-        styles: [ 
-          { elementType: 'geometry', stylers: [{color: '#242f3e'}] },
-          { elementType: 'labels.text.stroke', stylers: [{color: '#242f3e'}] },
-          { elementType: 'labels.text.fill', stylers: [{color: '#746855'}] },
-          { featureType: 'administrative.locality', elementType: 'labels.text.fill', stylers: [{color: '#d59563'}] },
-          { featureType: 'poi', elementType: 'labels.text.fill', stylers: [{color: '#d59563'}] },
-          { featureType: 'poi.park', elementType: 'geometry', stylers: [{color: '#263c3f'}] },
-          { featureType: 'poi.park', elementType: 'labels.text.fill', stylers: [{color: '#6b9a76'}] },
-          { featureType: 'road', elementType: 'geometry', stylers: [{color: '#38414e'}] },
-          { featureType: 'road', elementType: 'geometry.stroke', stylers: [{color: '#212a37'}] },
-          { featureType: 'road', elementType: 'labels.text.fill', stylers: [{color: '#9ca5b3'}] },
-          { featureType: 'road.highway', elementType: 'geometry', stylers: [{color: '#746855'}] },
-          { featureType: 'road.highway', elementType: 'geometry.stroke', stylers: [{color: '#1f2835'}] },
-          { featureType: 'road.highway', elementType: 'labels.text.fill', stylers: [{color: '#f3d19c'}] },
-          { featureType: 'transit', elementType: 'geometry', stylers: [{color: '#2f3948'}] },
-          { featureType: 'transit.station', elementType: 'labels.text.fill', stylers: [{color: '#d59563'}] },
-          { featureType: 'water', elementType: 'geometry', stylers: [{color: '#17263c'}] },
-          { featureType: 'water', elementType: 'labels.text.fill', stylers: [{color: '#515c6d'}] },
-          { featureType: 'water', elementType: 'labels.text.stroke', stylers: [{color: '#17263c'}] }
-        ]
+        styles: [ /* ...map styling here... */ ]
       });
-  
+
       marker = new google.maps.Marker({
         position: defaultLoc,
         map: map,
         title: "GPS Tracker"
       });
     }
-  
-    // Initialize the map on page load.
-    initMap();
-  
-    // Subscribe to the PubNub channel for receiving GPS data.
-    pubnub.subscribe({ channels: [channel] });
-    pubnub.addListener({
-      message: function(event) {
-        const { latitude, longitude } = event.message;
-        if (latitude && longitude) {
-          const newPos = { lat: latitude, lng: longitude };
-          marker.setPosition(newPos);
-          map.setCenter(newPos);
-          map.setZoom(16);
+
+    window.onload = () => {
+      initMap();
+      pubnub.subscribe({ channels: [channel] });
+      pubnub.addListener({
+        message: function(event) {
+          const { latitude, longitude } = event.message;
+          if (latitude && longitude) {
+            const newPos = { lat: latitude, lng: longitude };
+            marker.setPosition(newPos);
+            map.setCenter(newPos);
+            map.setZoom(16);
+          }
         }
-      }
-    });
-  
-    // Function to play the audio stream on user interaction.
-    function playAudio() {
-      var audioElement = document.getElementById('piStream');
-      // Some browsers require a user gesture to play audio.
-      audioElement.play().catch(function(error) {
-        console.error('Playback prevented:', error);
       });
-    }
+    };
   </script>
 </body>
 </html>
