@@ -89,14 +89,14 @@
 
     const channel = 'gps-tracker';
     let map;
-    const markers = {}; // Store markers by device ID
+    const markers = {}; // <-- Store multiple markers here
 
     function initMap() {
       const defaultLoc = { lat: 42.372240525186385, lng: -71.1336323150142 };
       map = new google.maps.Map(document.getElementById('map'), {
         center: defaultLoc,
         zoom: 2,
-        styles: [ /* ...your map styles here if needed... */ ]
+        styles: [ /* optional map styles */ ]
       });
     }
 
@@ -105,28 +105,30 @@
       pubnub.subscribe({ channels: [channel] });
       pubnub.addListener({
         message: function(event) {
-          const { latitude, longitude, deviceId } = event.message;
-          if (latitude && longitude) {
-            const newPos = { lat: latitude, lng: longitude };
-            const id = deviceId || "default-device"; // fallback if deviceId missing
+          const { deviceId, latitude, longitude } = event.message;
 
-            if (!markers[id]) {
-              // If marker for this device doesn't exist, create it
-              markers[id] = new google.maps.Marker({
-                position: newPos,
-                map: map,
-                label: id,
-                title: `Device: ${id}`
-              });
-            } else {
-              // Update existing marker position
-              markers[id].setPosition(newPos);
-            }
-
-            // Optionally center map to new device update
-            map.setCenter(newPos);
-            map.setZoom(16);
+          if (!deviceId || !latitude || !longitude) {
+            console.warn("⚠️ Missing deviceId, latitude or longitude in message.");
+            return;
           }
+
+          const position = { lat: latitude, lng: longitude };
+
+          // Check if marker for this device exists
+          if (!markers[deviceId]) {
+            // Create new marker
+            markers[deviceId] = new google.maps.Marker({
+              position: position,
+              map: map,
+              title: `Device ${deviceId}`
+            });
+          } else {
+            // Update existing marker position
+            markers[deviceId].setPosition(position);
+          }
+
+          map.setCenter(position);
+          map.setZoom(16);
         }
       });
     };
