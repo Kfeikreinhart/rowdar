@@ -1,55 +1,126 @@
-<!-- Map & GPS Script -->
-<script>
-  const pubnub = new PubNub({
-    publishKey: 'pub-c-b34ec225-e227-4a75-b8b7-45958644f07f',
-    subscribeKey: 'sub-c-1a48de9d-bfef-4c59-b911-5f400664dc60',
-    uuid: 'web-tracker'
-  });
 
-  const channel = 'gps-tracker';
-  let map;
-  const markers = {}; // 👈 New: store markers by device UUID
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RowDar Coaches' Interface</title>
+  <link rel="stylesheet" href="style.css">
 
-  function initMap() {
-    const defaultLoc = { lat: 42.372240525186385, lng: -71.1336323150142 };
-    map = new google.maps.Map(document.getElementById('map'), {
-      center: defaultLoc,
-      zoom: 2,
-      styles: [ /* ...map styling here... */ ]
-    });
-  }
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap" rel="stylesheet">
 
-  window.onload = () => {
-    initMap();
-    pubnub.subscribe({ channels: [channel] });
-    pubnub.addListener({
-      message: function(event) {
-        const { latitude, longitude, uuid } = event.message; // 👈 Expect each message to contain uuid
-        if (latitude && longitude && uuid) {
-          const position = { lat: latitude, lng: longitude };
+  <!-- Google Maps -->
+  <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDv-XXvnWnZ3_BW65BZMG6DYRFRFuQpdl4"></script>
 
-          // If marker for this device doesn't exist yet, create it
-          if (!markers[uuid]) {
-            markers[uuid] = new google.maps.Marker({
-              position: position,
-              map: map,
-              title: `Device: ${uuid}`,
-              label: {
-                text: uuid.substring(0, 4), // Short label from UUID
-                color: "white",
-                fontSize: "10px",
-                fontWeight: "bold"
-              }
-            });
-          } else {
-            // If exists, just update the marker's position
-            markers[uuid].setPosition(position);
+  <!-- PubNub -->
+  <script src="https://cdn.pubnub.com/sdk/javascript/pubnub.7.2.2.min.js"></script>
+
+  <!-- Socket.IO -->
+  <script src="/socket.io/socket.io.js"></script>
+</head>
+
+<body>
+  <header>
+    <h1>RowDar Coaches' Interface</h1>
+  </header>
+
+  <div class="container">
+    <section class="mapHalf">
+      <h1>Live Map Data</h1>
+      <div id="map"></div>
+    </section>
+
+    <section class="livestreamHalf">
+      <h1>Live Audio Stream</h1>
+      <audio id="audio" autoplay controls playsinline muted></audio>
+
+      <script>
+        const socket = io();
+        const pc = new RTCPeerConnection();
+        const audio = document.getElementById("audio");
+
+        pc.ontrack = (event) => {
+          console.log("✅ Received track event");
+          audio.srcObject = event.streams[0];
+          audio.play().then(() => {
+            console.log("🔊 Audio is playing");
+          }).catch(err => {
+            console.error("❌ audio.play() failed:", err);
+          });
+        };
+
+        pc.oniceconnectionstatechange = () => {
+          console.log("ICE state:", pc.iceConnectionState);
+        };
+
+        pc.onicecandidate = (event) => {
+          if (event.candidate) {
+            socket.emit("ice-candidate", event.candidate);
+            console.log("📤 Sent ICE candidate");
           }
+        };
 
-          map.setCenter(position);
-          map.setZoom(16);
-        }
-      }
+        socket.on("ice-candidate", (candidate) => {
+          console.log("📥 Received ICE candidate");
+          pc.addIceCandidate(candidate);
+        });
+
+        socket.on("offer", async (offer) => {
+          console.log("📡 Got offer");
+          await pc.setRemoteDescription(offer);
+          const answer = await pc.createAnswer();
+          await pc.setLocalDescription(answer);
+          socket.emit("answer", pc.localDescription);
+          console.log("📨 Sent answer");
+        });
+      </script>
+    </section>
+  </div>
+
+  <!-- Map & GPS Script -->
+  <script>
+    const pubnub = new PubNub({
+      publishKey: 'pub-c-b34ec225-e227-4a75-b8b7-45958644f07f',
+      subscribeKey: 'sub-c-1a48de9d-bfef-4c59-b911-5f400664dc60',
+      uuid: 'web-tracker'
     });
-  };
-</script>
+
+    const channel = 'gps-tracker';
+    let map, marker;
+
+    function initMap() {
+      const defaultLoc = { lat: 42.372240525186385, lng: -71.1336323150142 };
+      map = new google.maps.Map(document.getElementById('map'), {
+        center: defaultLoc,
+        zoom: 2,
+        styles: [ /* ...map styling here... */ ]
+      });
+
+      marker = new google.maps.Marker({
+        position: defaultLoc,
+        map: map,
+        title: "GPS Tracker"
+      });
+    }
+
+    window.onload = () => {
+      initMap();
+      pubnub.subscribe({ channels: [channel] });
+      pubnub.addListener({
+        message: function(event) {
+          const { latitude, longitude } = event.message;
+          if (latitude && longitude) {
+            const newPos = { lat: latitude, lng: longitude };
+            marker.setPosition(newPos);
+            map.setCenter(newPos);
+            map.setZoom(16);
+          }
+        }
+      });
+    };
+  </script>
+</body>
+</html>
